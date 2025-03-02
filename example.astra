@@ -1,0 +1,17 @@
+fn main() -> int {
+num: int = 3
+match (num) {
+case(1) {
+print("one")
+break
+};
+case(2) {
+print("two")
+break
+};
+default: {
+print("not one or two")
+break
+};
+};
+}
