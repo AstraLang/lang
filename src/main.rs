@@ -99,8 +99,6 @@ impl AstraTranspiler {
 			"#define priv private".to_string(),
 			"#define prot protected".to_string(),
 			"#define println print".to_string(),
-			"#define wfile ofstream".to_string(),
-			"#define rfile ifstream".to_string(),
 			"#define null nullptr".to_string(),
 			"#define mut const".to_string(),
 			"#define match(val) switch(val)".to_string(),
@@ -113,13 +111,19 @@ impl AstraTranspiler {
 			"#include <ctime>".to_string(),
             "#include <stdexcept>".to_string(),
             "#include <cstdio>".to_string(),
+			"#include <filesystem>".to_string(),
+			"#include <iostream>".to_string(),
+			"#include <vector>".to_string(),
             "".to_string(),
             "using namespace std;".to_string(),
             "".to_string(),
             "void print(auto x) {cout << x << '\\n';}".to_string(),
             "int $(char* x) {return system(x);}".to_string(),
+			"namespace Astra {".to_string(),
+			"class fs { pub: static void write(const std::string& p, const std::string& c) { std::ofstream(p) << c; } static std::string read(const std::string& p) { std::ifstream f(p); return {std::istreambuf_iterator<char>(f), {}}; } static void remove(const std::string& p) { std::filesystem::remove(p); } static std::vector<std::string> list(const std::string& d) { std::vector<std::string> fs; for (auto& e : std::filesystem::directory_iterator(d)) {fs.push_back(e.path().string());} return fs; } };".to_string(),
+			"}".to_string(),
 			"".to_string(),
-        ];
+		];
         
         let mut i = 0;
         while i < lines.len() {

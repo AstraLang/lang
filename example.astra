@@ -1,17 +1,10 @@
 fn main() -> int {
-num: int = 3
-match (num) {
-case(1) {
-print("one")
-break
-};
-case(2) {
-print("two")
-break
-};
-default: {
-print("not one or two")
-break
-};
-};
+    Astra::fs::write("test.txt", "Hello, Astra!")
+    print(Astra::fs::read("test.txt") + '\n')
+	files: any = Astra::fs::list(".")
+    for file in files
+	{
+		print(file + '\n')
+	}
+    Astra::fs::remove("test.txt")
 }
