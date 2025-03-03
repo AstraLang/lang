@@ -167,6 +167,12 @@ impl AstraTranspiler {
                 i += 1;
                 continue;
             }
+			
+			if line.start_with("ifdef ") {
+				cpp_lines.push(line.replace("ifdef ", "#ifdef "));
+				i += 1;
+				continue;
+			}
                 
             if line.starts_with("type ") {
                 let mut x = "";
