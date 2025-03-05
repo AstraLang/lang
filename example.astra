@@ -1,10 +1,12 @@
+lib Test {
+	class Example {
+		pub fn doIt() -> void {
+			print("Did it")
+		}
+	};
+}; // semicolon after each class and lib
+
 fn main() -> int {
-    Astra::fs::write("test.txt", "Hello, Astra!")
-    print(Astra::fs::read("test.txt") + '\n')
-	files: any = Astra::fs::list(".")
-    for file in files
-	{
-		print(file + '\n')
-	}
-    Astra::fs::remove("test.txt")
+Test::Example example
+example.doIt()
 }

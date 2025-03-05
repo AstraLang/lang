@@ -95,11 +95,14 @@ impl AstraTranspiler {
         let mut cpp_lines = vec![
 		    "#include <iostream>".to_string(),
             "#define any auto".to_string(),
-			"#define ns namespace".to_string(),
+			"#define lib namespace".to_string(),
+			"#define tn typename".to_string(),
 			"#define pub public".to_string(),
 			"#define priv private".to_string(),
 			"#define prot protected".to_string(),
+			"#define virt virtual".to_string(),
 			"#define println print".to_string(),
+			"#define blueprint(...) template <__VA_ARGS__>".to_string(),
 			"#define null nullptr".to_string(),
 			"#define mut const".to_string(),
 			"#define match(val) switch(val)".to_string(),
@@ -120,10 +123,26 @@ impl AstraTranspiler {
             "".to_string(),
             "void print(auto x) {cout << x << '\\n';}".to_string(),
             "int $(char* x) {return system(x);}".to_string(),
-			"ns Astra {".to_string(),
+			"lib Astra {".to_string(),
 			"class fs { pub: static void write(const std::string& p, const std::string& c) { std::ofstream(p) << c; } static std::string read(const std::string& p) { std::ifstream f(p); return {std::istreambuf_iterator<char>(f), {}}; } static void remove(const std::string& p) { std::filesystem::remove(p); } static std::vector<std::string> list(const std::string& d) { std::vector<std::string> fs; for (auto& e : std::filesystem::directory_iterator(d)) {fs.push_back(e.path().string());} return fs; } };".to_string(),
+			"blueprint(tn T)".to_string(),
+			"class DynamicArray {".to_string(),
+			"pub:".to_string(),
+			"    T* arr;".to_string(),
+			"    size_t capacity, size;".to_string(),
+			"    void resize() { capacity *= 2; T* newArr = new T[capacity]; for (size_t i = 0; i < size; ++i) newArr[i] = arr[i]; delete[] arr; arr = newArr; }".to_string(),
+			"    DynamicArray(size_t initial_capacity = 2) : capacity(initial_capacity), size(0) { arr = new T[capacity]; }".to_string(),
+			"    ~DynamicArray() { delete[] arr; }".to_string(),
+			"    void add(T value) { if (size == capacity) resize(); arr[size++] = value; }".to_string(),
+			"    T get(size_t index) const { if (index >= size) throw std::out_of_range(\"Index out of range\"); return arr[index]; }".to_string(),
+			"    size_t getSize() const { return size; }".to_string(),
+			"    void removeAt(size_t index) { if (index >= size) throw std::out_of_range(\"Index out of range\"); for (size_t i = index; i < size - 1; ++i) arr[i] = arr[i + 1]; --size; }" .to_string(),
+			"    void print() const { for (size_t i = 0; i < size; ++i) std::cout << arr[i] << ' '; std::cout << std::endl; }" .to_string(),
+			"};" .to_string(),
 			"}".to_string(),
-			"".to_string(),
+			"/*".to_string(),
+			"	----TRANSPILED ASTRA CODE----".to_string(),
+			"*/".to_string(),
 		];
         
         let mut i = 0;
@@ -136,7 +155,7 @@ impl AstraTranspiler {
                 continue;
             }
 
-            if line == "::++ {" {
+            if line == "::++ {" || line.starts_with("::++ {") {
                 self.in_raw_cpp = true;
                 i += 1;
                 continue;
@@ -169,8 +188,13 @@ impl AstraTranspiler {
                 continue;
             }
 			
-			if line.start_with("ifdef ") {
+			if line.starts_with("ifdef ") {
 				cpp_lines.push(line.replace("ifdef ", "#ifdef "));
+				i += 1;
+				continue;
+			}
+			if line.starts_with("ifndef ") {
+				cpp_lines.push(line.replace("ifndef ", "#ifndef "));
 				i += 1;
 				continue;
 			}
@@ -193,6 +217,8 @@ impl AstraTranspiler {
 				cpp_lines.extend(self.process_protected_function_definition(line));
 			} else if line.starts_with("priv fn ") {
 				cpp_lines.extend(self.process_private_function_definition(line));
+			} else if line.starts_with("virt fn ") {
+				cpp_lines.extend(self.process_virtual_function_definition(line));
             } else if line.starts_with("if ") {
                 cpp_lines.extend(self.process_if_statement(line));
             } else if line.starts_with("else ") {
@@ -298,6 +324,43 @@ impl AstraTranspiler {
         }
         
         return vec![format!("// Error parsing public function: {}", line)];
+    }
+	
+    fn process_virtual_function_definition(&mut self, line: &str) -> Vec<String> {
+        let function_pattern = Regex::new(r"virt fn (\w+)\((.*?)\)(?: -> (\w+))?").unwrap();
+        
+        if let Some(captures) = function_pattern.captures(line) {
+            let name = captures.get(1).map_or("", |m| m.as_str());
+            let params = captures.get(2).map_or("", |m| m.as_str());
+            let return_type = captures.get(3).map_or("void", |m| m.as_str());
+
+            let mut param_list = Vec::new();
+            if !params.is_empty() {
+                for param in params.split(',') {
+                    let param = param.trim();
+                    if param.contains(':') {
+                        let parts: Vec<&str> = param.split(':').collect();
+                        param_list.push(format!("{} {}", parts[1].trim(), parts[0].trim()));
+                    } else {
+                        param_list.push(format!("any {}", param));
+                    }
+                }
+            }
+            
+            let function_signature = format!("{} {}({})", return_type, name, param_list.join(", "));
+            self.functions.insert(name.to_string(), FunctionInfo {
+                return_type: return_type.to_string(),
+                params: param_list,
+            });
+            self.in_function = true;
+            self.current_indent += 1;
+            
+            return vec![
+                format!("virtual {} {{", function_signature),
+            ];
+        }
+        
+        return vec![format!("// Error parsing virtual function: {}", line)];
     }
 	
     fn process_protected_function_definition(&mut self, line: &str) -> Vec<String> {
