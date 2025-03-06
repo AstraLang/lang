@@ -3,8 +3,8 @@ lib Test {
 		pub fn doIt() -> void {
 			print("Did it")
 		}
-	};
-}; // semicolon after each class and lib
+	}
+}
 
 fn main() -> int {
 	Test::Example example
