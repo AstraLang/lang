@@ -7,6 +7,6 @@ lib Test {
 }; // semicolon after each class and lib
 
 fn main() -> int {
-Test::Example example
-example.doIt()
+	Test::Example example
+	example.doIt()
 }
