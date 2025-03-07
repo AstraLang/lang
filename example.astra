@@ -1,12 +1,133 @@
-lib Test {
-	class Example {
-		pub fn doIt() -> void {
-			print("Did it")
-		}
-	}
+## Preprocessor directives
+use vector
+def PI 3.14159265
+
+enum Direction {
+    North,
+    South,
+    East,
+    West,
 }
 
+## Blueprinted class
+blueprint(tn T) //
+class Box {
+pub:
+    T content
+    
+    static Box<T> create(T val) {
+        return Box { content: val }
+    }
+}
+
+## Base class with virtual function
+class Shape {
+pub:
+virt fn area() -> double {
+return 0
+}
+}
+
+## Derived class
+class Circle : pub Shape {
+priv: double radius
+pub:Circle(double r) {
+        ::++ {
+		radius = r;
+		}
+    }
+    
+    fn area() -> double {
+        return PI * radius * radius
+    }
+}
+
+## Function with different access modifiers
+class TestClass {
+pub fn public_func() {
+        println("Public function")
+    }
+
+priv fn private_func() {
+        println("Private function")
+    }
+
+prot fn protected_func() {
+        println("Protected function")
+    }
+}
+
+## Main program
 fn main() -> int {
-	Test::Example example
-	example.doIt()
+    // Variables
+    mut x: int = 10
+    y: any = "Hello"
+    z: any = true
+    
+    // Control structures
+    if (x > 5) {
+        println("x is greater than 5")
+    } else if (x == 5) {
+        println("x is exactly 5")
+    } else {
+        println("x is less than 5")
+    }
+    
+    // Loops
+    for i in range(0, 5) {
+        println("Range loop iteration: " + to_string(i))
+    }
+    
+    list: vector<int> = {1, 2, 3, 4, 5}
+    for num in list {
+        println("Foreach loop value: " + to_string(num))
+    }
+    
+    counter = 3
+    while (counter > 0) {
+        println("Countdown: " + to_string(counter))
+        counter -= 1
+    }
+    
+    // Raw C++ block
+    ::++ {
+        std::cout << "This is raw C++ code!\n";
+        auto raw_cpp_var = 42;
+        std::cout << "Raw C++ value: " << raw_cpp_var << "\n";
+    }
+    
+    // Using standard library components
+    Astra::fs::write("test.txt", "File created by Astra!")
+    content = Astra::fs::read("test.txt")
+    println("File content: " + content)
+    
+    // Match statement
+    dir: Direction = Direction::North
+    match(dir) {
+        case(Direction::North) println("Heading North")
+        case(Direction::South) println("Heading South")
+        case(Direction::East)  println("Heading East")
+        case(Direction::West)  println("Heading West")
+    }
+    
+    // Blueprinted class
+    box: Box<string> = Box<string>::create("hi")
+    println("Box content: " + box.content)
+    
+    // Dynamic array
+    arr: Astra::DynamicArray<string> = Astra::DynamicArray<string>()
+    arr.add("First")
+    arr.add("Second")
+    arr.add("Third")
+	arr.print()
+    
+    // Shell command
+    $("echo 'System command executed successfully'")
+    
+    // Polymorphism
+    shape: Shape* = new Circle(5.0)
+    println("Circle area: " + to_string(shape->area()))
+    delete shape
+    
+    return 0
 }

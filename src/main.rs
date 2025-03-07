@@ -9,20 +9,21 @@ use lazy_static::lazy_static;
 #[derive(Parser)]
 #[command(name = "Astra")]
 #[command(author = "NEOAPPS")]
-#[command(version = "1.0")]
-#[command(about = "The Powerful Transpiled Programming Language", long_about = None)]
+#[command(version = "1.1.0")]
+#[command(about = "The Powerful Transpiled Programming Language", long_about = "The Powerful Transpiled Programming Language")]
 struct Cli {
-    #[arg(value_name = "INPUT")]
-    input: Option<String>,
     #[command(subcommand)]
     command: Option<Commands>,
+	#[arg(value_name = "INPUT")]
+    input: Option<String>,
 }
 
 #[derive(Subcommand)]
 enum Commands {
+	/// Transpiles Astra Code into C++
     Transpile { input: String },
+	/// Transpiles then Compiles Astra Code
     Compile { input: String },
-    Run { input: String },
 }
 
 struct AstraTranspiler {
@@ -101,22 +102,23 @@ fn transpile(&mut self, filename: &str) -> Option<String> {
             "#include <vector>".to_string(),
             "using namespace std;".to_string(),
             "void print(auto x) {cout << x << '\\n';}".to_string(),
+            "void printn(auto x) {cout << x;}".to_string(),
             "int $(char* x) {return system(x);}".to_string(),
             "lib Astra {".to_string(),
             "class fs { pub: static void write(const std::string& p, const std::string& c) { std::ofstream(p) << c; } static std::string read(const std::string& p) { std::ifstream f(p); return {std::istreambuf_iterator<char>(f), {}}; } static void remove(const std::string& p) { std::filesystem::remove(p); } static std::vector<std::string> list(const std::string& d) { std::vector<std::string> fs; for (auto& e : std::filesystem::directory_iterator(d)) {fs.push_back(e.path().string());} return fs; } };".to_string(),
             "blueprint(tn T)".to_string(),
             "class DynamicArray {".to_string(),
             "pub:".to_string(),
-            "    T* arr;".to_string(),
-            "    size_t capacity, size;".to_string(),
-            "    void resize() { capacity *= 2; T* newArr = new T[capacity]; for (size_t i = 0; i < size; ++i) newArr[i] = arr[i]; delete[] arr; arr = newArr; }".to_string(),
-            "    DynamicArray(size_t initial_capacity = 2) : capacity(initial_capacity), size(0) { arr = new T[capacity]; }".to_string(),
-            "    ~DynamicArray() { delete[] arr; }".to_string(),
-            "    void add(T value) { if (size == capacity) resize(); arr[size++] = value; }".to_string(),
-            "    T get(size_t index) const { if (index >= size) throw std::out_of_range(\"Index out of range\"); return arr[index]; }".to_string(),
-            "    size_t getSize() const { return size; }".to_string(),
-            "    void removeAt(size_t index) { if (index >= size) throw std::out_of_range(\"Index out of range\"); for (size_t i = index; i < size - 1; ++i) arr[i] = arr[i + 1]; --size; }".to_string(),
-            "    void print() const { for (size_t i = 0; i < size; ++i) std::cout << arr[i] << ' '; std::cout << std::endl; }".to_string(),
+            "T* arr;".to_string(),
+            "size_t capacity, size;".to_string(),
+            "void resize() { capacity *= 2; T* newArr = new T[capacity]; for (size_t i = 0; i < size; ++i) newArr[i] = arr[i]; delete[] arr; arr = newArr; }".to_string(),
+            "DynamicArray(size_t initial_capacity = 2) : capacity(initial_capacity), size(0) { arr = new T[capacity]; }".to_string(),
+            "~DynamicArray() { delete[] arr; }".to_string(),
+            "void add(T value) { if (size == capacity) resize(); arr[size++] = value; }".to_string(),
+            "T get(size_t index) const { if (index >= size) throw std::out_of_range(\"Index out of range\"); return arr[index]; }".to_string(),
+            "size_t getSize() const { return size; }".to_string(),
+            "void removeAt(size_t index) { if (index >= size) throw std::out_of_range(\"Index out of range\"); for (size_t i = index; i < size - 1; ++i) arr[i] = arr[i + 1]; --size; }".to_string(),
+            "void print() const { for (size_t i = 0; i < size; ++i) std::cout << arr[i] << ' '; std::cout << std::endl; }".to_string(),
             "};".to_string(),
             "}".to_string(),
         ];
@@ -155,9 +157,12 @@ fn transpile(&mut self, filename: &str) -> Option<String> {
             match line.split_once(' ') {
                 Some(("use", rest)) => cpp_lines.push(format!("#include <{}>", rest.trim())),
                 Some(("def", rest)) => cpp_lines.push(format!("#define {}", rest)),
-                Some(("type", rest)) => cpp_lines.push(rest.replace("type", "enum") + if rest.ends_with(';') { "" } else { ";" }),
+				Some(("ifdef", rest)) => cpp_lines.push(format!("#ifdef {}", rest)),
+				Some(("ifndef", rest)) => cpp_lines.push(format!("#ifndef {}", rest)),
+				Some(("endif", rest)) => cpp_lines.push(format!("#endif {}", rest)),
+				Some(("type", rest)) => cpp_lines.push(rest.replace("type ", "enum ") + if rest.ends_with(';') || rest.ends_with('{') { "" } else { ";" }),
                 _ => {
-                    if line.starts_with("fn") || line.starts_with("pub fn") || line.starts_with("priv fn") || line.starts_with("prot fn") || line.starts_with("virt fn") {
+                    if line.starts_with("fn") || line.starts_with("pub fn") || line.starts_with("priv fn") || line.starts_with("prot fn") || line.starts_with("virt fn") || line.starts_with("stat fn") {
                         if let Some(captures) = FN_REGEX.captures(line) {
                             let modifier = captures.get(1).map_or("", |m| m.as_str().trim());
                             let name = captures.get(2).unwrap().as_str();
@@ -175,15 +180,16 @@ fn transpile(&mut self, filename: &str) -> Option<String> {
                                 .collect();
 
                             let access = match modifier {
-                                "pub" => "public:",
-                                "priv" => "private:",
-                                "prot" => "protected:",
+                                "pub" => "pub:",
+                                "priv" => "priv:",
+                                "prot" => "prot:",
                                 "virt" => "virtual",
+								"stat" => "static",
                                 _ => "",
                             };
-
+							
                             let sig = format!("{}{} {}({})", 
-                                if modifier == "virt" { "virtual " } else { "" },
+                                if modifier == "virt" { "virtual " } else if modifier == "stat" { "static " } else { "" },
                                 return_type, name, param_list.join(", "));
 
                             cpp_lines.push(if !access.is_empty() && modifier != "virt" {
@@ -192,18 +198,16 @@ fn transpile(&mut self, filename: &str) -> Option<String> {
                                 sig
                             } + " {");
                             
-                            self.current_indent += 1;
                         }
                     }
                     else if line.starts_with("if ") {
-                        cpp_lines.push(format!("{}if ({}) {{", "    ".repeat(self.current_indent), &line[3..].trim()));
-                        self.current_indent += 1;
+                        cpp_lines.push(format!("if {}", &line[3..].trim()));
                     }
-                    else if line.starts_with("else if ") {
-                        cpp_lines.push(format!("{}else if ({}) {{", "    ".repeat(self.current_indent - 1), &line[7..].trim()));
+                    else if line.starts_with("} else if ") {
+						cpp_lines.push(format!("}} else {}", &line[7..].trim()));
                     }
-                    else if line.starts_with("else") {
-                        cpp_lines.push(format!("{}else {{", "    ".repeat(self.current_indent - 1)));
+					else if line.starts_with("} else") {
+						cpp_lines.push(format!("}} {}else {{", ""));
                     }
                     else if line.starts_with("for ") {
                         if let Some(caps) = RANGE_REGEX.captures(line) {
@@ -212,47 +216,41 @@ fn transpile(&mut self, filename: &str) -> Option<String> {
                                 caps.get(2).unwrap().as_str(),
                                 caps.get(3).unwrap().as_str()
                             );
-                            cpp_lines.push(format!("{}for (int {} = {}; {} < {}; ++{}) {{", 
-                                "    ".repeat(self.current_indent),
+                            cpp_lines.push(format!("{}for (int {} = {}; {} < {}; {}++) {{", 
+                                "".repeat(self.current_indent),
                                 var, start, var, end, var
                             ));
-                            self.current_indent += 1;
                         } else if let Some(caps) = FOREACH_REGEX.captures(line) {
                             let (var, container) = (
                                 caps.get(1).unwrap().as_str(),
                                 caps.get(2).unwrap().as_str()
                             );
-                            cpp_lines.push(format!("{}for (auto&& {} : {}) {{", 
-                                "    ".repeat(self.current_indent),
+                            cpp_lines.push(format!("{}for (any&& {} : {}) {{", 
+                                "".repeat(self.current_indent),
                                 var, container
                             ));
-                            self.current_indent += 1;
                         }
                     }
                     else if line.starts_with("while ") {
-                        cpp_lines.push(format!("{}while ({}) {{", "    ".repeat(self.current_indent), &line[6..].trim()));
-                        self.current_indent += 1;
+                        cpp_lines.push(format!("while {}", &line[6..].trim()));
                     }
                     else if line.starts_with("return ") {
                         let ret = &line[7..].trim();
-                        cpp_lines.push(format!("{}return{};", "    ".repeat(self.current_indent), 
-                            if ret.ends_with(';') { &ret[..ret.len()-1] } else { ret }));
+                        cpp_lines.push(format!("return {};",if ret.ends_with(';') { &ret[..ret.len()-1] } else { ret }));
                     }
-                    else if line.contains('=') {
+                    else if line.contains('=') && !line.contains("-=") && !line.contains("+=") && !line.contains("*=") && !line.contains("/=") {
                         if let Some((left, right)) = line.split_once('=') {
                             let (name, var_type) = left.split_once(':').map(|(n, t)| (n.trim(), t.trim()))
                                 .unwrap_or((left.trim(), "any"));
                             let value = right.trim().trim_end_matches(';');
-                            cpp_lines.push(format!("{}{} {} = {};", 
-                                "    ".repeat(self.current_indent),
+                            cpp_lines.push(format!("{} {} = {};", 
                                 var_type, name, value));
                         }
                     }
                     else {
-                        cpp_lines.push(format!("{}{}{}", 
-                            "    ".repeat(self.current_indent),
+                        cpp_lines.push(format!("{}{}", 
                             line,
-                            if line.ends_with('{') { "" } else { ";" }));
+                            if line.ends_with('{') || line.ends_with(',') || line.ends_with(':') || line.ends_with(';') { "" } else { ";" }));
                     }
                 }
             }
@@ -278,7 +276,7 @@ fn compile_cpp(cpp_filename: &str) -> Option<String> {
         .output()
         .map(|output| {
             if output.status.success() {
-                println!("{} Successfully compiled {}", "✓".green(), cpp_filename.cyan());
+                println!("{} Successfully compiled to {}", "✓".green(), &out_filename.cyan());
                 Some(out_filename)
             } else {
                 println!("{} Compilation error:\n{}", "✗".red(), String::from_utf8_lossy(&output.stderr));
@@ -288,19 +286,6 @@ fn compile_cpp(cpp_filename: &str) -> Option<String> {
         .unwrap_or_else(|e| {
             println!("{} Compiler error: {}", "✗".red(), e);
             None
-        })
-}
-
-fn run_executable(executable: &str) -> i32 {
-    Command::new(executable)
-        .status()
-        .map(|status| {
-            println!("{} Program exited with code {}", "✓".green(), status.code().unwrap_or(0));
-            status.code().unwrap_or(0)
-        })
-        .unwrap_or_else(|e| {
-            println!("{} Execution failed: {}", "✗".red(), e);
-            1
         })
 }
 
@@ -319,7 +304,7 @@ fn main() {
     let cli = Cli::parse();
 
     let filename = match &cli.command {
-        Some(Commands::Transpile { input }) | Some(Commands::Compile { input }) | Some(Commands::Run { input }) => input,
+        Some(Commands::Transpile { input }) | Some(Commands::Compile { input }) => input,
         None => cli.input.as_ref().unwrap_or_else(|| {
             println!("{} Usage: astra [COMMAND] filename.astra", "⚠".yellow());
             exit(1);
@@ -335,12 +320,10 @@ fn main() {
     let cpp_file = transpiler.transpile(filename);
 
     match &cli.command {
-        Some(Commands::Compile { .. } | Commands::Run { .. }) => {
+        Some(Commands::Compile { .. }) => {
             if let Some(cpp) = cpp_file {
                 if let Some(exe) = compile_cpp(&cpp) {
-                    if let Some(Commands::Run { .. }) = cli.command {
-                        exit(run_executable(&exe));
-                    }
+					exit(0)
                 } else {
                     exit(1);
                 }
